@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trainedml : démo web</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f9f9f7;          /* fond de page */
+    --surface: #fcfcfb;        /* cartes */
+    --ink: #0b0b0b;            /* texte principal */
+    --ink-2: #52514e;          /* texte secondaire */
+    --muted: #898781;          /* libellés discrets */
+    --hairline: rgba(11,11,11,0.10);
+    --grid: #e1e0d9;
+    --accent: #2a78d6;         /* bleu, slot 1 */
+    --accent-strong: #1c5cab;
+    --bar: #2a78d6;            /* remplissage des barres de score */
+    --bar-track: #cde2fb;      /* piste : pas plus clair du même bleu */
+    --good: #006300;
+    --critical: #d03b3b;
+    --chip-bg: rgba(42,120,214,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --plane: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --hairline: rgba(255,255,255,0.10);
+      --grid: #2c2c2a;
+      --accent: #3987e5;
+      --accent-strong: #6da7ec;
+      --bar: #3987e5;
+      --bar-track: #184f95;
+      --good: #0ca30c;
+      --critical: #e66767;
+      --chip-bg: rgba(57,135,229,0.16);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--plane); color: var(--ink);
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         line-height: 1.5; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header { border-bottom: 1px solid var(--hairline); background: var(--surface); }
+  .head-inner { max-width: 960px; margin: 0 auto; padding: 1.4rem 1.5rem;
+                display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .brand { font-size: 1.25rem; font-weight: 650; letter-spacing: -.01em; }
+  .brand .dot { color: var(--accent); }
+  .tagline { color: var(--ink-2); font-size: .9rem; flex: 1; }
+  nav { font-size: .9rem; display: flex; gap: 1.1rem; }
+
+  main { max-width: 960px; margin: 1.6rem auto 3rem; padding: 0 1.5rem;
+         display: grid; gap: 1.1rem; }
+  section { background: var(--surface); border: 1px solid var(--hairline);
+            border-radius: 12px; padding: 1.25rem 1.4rem 1.4rem; }
+  .step { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .2rem; }
+  .step .num { width: 1.5rem; height: 1.5rem; border-radius: 50%; flex: none;
+               background: var(--accent); color: #fff; font-size: .8rem; font-weight: 650;
+               display: inline-flex; align-items: center; justify-content: center;
+               transform: translateY(.18rem); }
+  h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+  .hint { color: var(--ink-2); font-size: .87rem; margin: .2rem 0 .9rem 2.1rem; }
+
+  .controls { display: flex; gap: .9rem; flex-wrap: wrap; align-items: flex-end;
+              margin-left: 2.1rem; }
+  .field { display: flex; flex-direction: column; gap: .25rem; }
+  .field > span { font-size: .78rem; color: var(--muted); }
+  select, input, textarea {
+    font: inherit; color: var(--ink); background: var(--plane);
+    border: 1px solid var(--grid); border-radius: 8px; padding: .42rem .6rem; }
+  select:focus, input:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px; }
+  textarea { width: 100%; min-height: 72px; font-family: ui-monospace, Consolas, monospace;
+             font-size: .84rem; }
+  .full { margin-left: 2.1rem; margin-bottom: .6rem; }
+
+  button.action { font: inherit; font-weight: 600; color: #fff; background: var(--accent);
+    border: none; border-radius: 8px; padding: .5rem 1.2rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: .5rem; }
+  button.action:hover { background: var(--accent-strong); }
+  button.action:disabled { opacity: .6; cursor: progress; }
+  .spinner { width: .85rem; height: .85rem; border-radius: 50%; display: none;
+    border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+    animation: spin .7s linear infinite; }
+  button.busy .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .out { margin: 1rem 0 0 2.1rem; font-size: .9rem; }
+  .meta { color: var(--ink-2); font-size: .85rem; margin-bottom: .6rem; }
+  .error { color: var(--critical); font-weight: 500; }
+  .error::before { content: "✕ "; }
+  .okline { color: var(--good); font-weight: 500; }
+
+  /* Tuiles de score */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+           gap: .7rem; }
+  .tile { border: 1px solid var(--hairline); border-radius: 10px; padding: .7rem .9rem;
+          background: var(--plane); }
+  .tile .label { font-size: .78rem; color: var(--muted); }
+  .tile .value { font-size: 1.45rem; font-weight: 600; letter-spacing: -.01em; }
+
+  /* Prédictions */
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .chip { background: var(--chip-bg); color: var(--ink); border: 1px solid var(--hairline);
+          border-radius: 999px; padding: .28rem .8rem; font-size: .88rem; }
+  .chip b { color: var(--accent-strong); font-weight: 650; }
+
+  /* Tableau comparatif */
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+  th, td { padding: .45rem .7rem; text-align: right; white-space: nowrap;
+           border-bottom: 1px solid var(--grid);
+           font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 550; font-size: .78rem; }
+  td:first-child, th:first-child { text-align: left; }
+  tr.best td:first-child::after { content: " meilleur"; color: var(--good);
+    font-size: .72rem; font-weight: 650; text-transform: uppercase;
+    letter-spacing: .04em; margin-left: .4rem; }
+  tbody tr:hover td { background: var(--chip-bg); }
+  .scorebar { display: inline-flex; align-items: center; gap: .55rem; }
+  .scorebar .track { width: 110px; height: 8px; border-radius: 4px;
+    background: var(--bar-track); overflow: hidden; flex: none; }
+  .scorebar .fill { display: block; height: 100%; background: var(--bar);
+    border-radius: 0 4px 4px 0; }
+
+  footer { max-width: 960px; margin: 0 auto 2rem; padding: 0 1.5rem;
+           color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-inner">
+    <div class="brand">trained<span class="dot">ml</span></div>
+    <div class="tagline">Le machine learning côté serveur, la page ne fait que des appels HTTP.</div>
+    <nav>
+      <a href="/docs">API /docs</a>
+      <a href="https://github.com/diamankayero/trainedml">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+
+<section>
+  <div class="step"><span class="num">1</span><h2>Entraîner un modèle</h2></div>
+  <p class="hint">Choisissez un dataset et un modèle ; le prétraitement (standardisation, encodage) est automatique.</p>
+  <div class="controls">
+    <label class="field"><span>Dataset</span>
+      <select id="train-dataset">
+        <option value="iris">iris</option>
+        <option value="wine">wine</option>
+      </select>
+    </label>
+    <label class="field"><span>Modèle</span><select id="train-model"></select></label>
+    <label class="field"><span>Seed</span>
+      <input id="train-seed" type="number" value="42" style="width:5.5rem"></label>
+    <button class="action" id="btn-train"><span class="spinner"></span>Entraîner</button>
+  </div>
+  <div class="out" id="out-train"></div>
+</section>
+
+<section>
+  <div class="step"><span class="num">2</span><h2>Prédire</h2></div>
+  <p class="hint">Une ligne par observation, au format JSON, avec les mêmes colonnes que l'entraînement.</p>
+  <div class="full">
+    <textarea id="predict-features">[[5.1, 3.5, 1.4, 0.2], [6.2, 2.8, 4.8, 1.8]]</textarea>
+  </div>
+  <div class="controls">
+    <button class="action" id="btn-predict"><span class="spinner"></span>Prédire</button>
+  </div>
+  <div class="out" id="out-predict"></div>
+</section>
+
+<section>
+  <div class="step"><span class="num">3</span><h2>Comparer tous les modèles</h2></div>
+  <p class="hint">Validation croisée : chaque modèle est entraîné et évalué sur plusieurs découpages, le tableau est trié du meilleur au moins bon.</p>
+  <div class="controls">
+    <label class="field"><span>Dataset</span>
+      <select id="cmp-dataset">
+        <option value="wine">wine</option>
+        <option value="iris">iris</option>
+      </select>
+    </label>
+    <label class="field"><span>Plis</span>
+      <input id="cmp-cv" type="number" value="5" min="2" max="20" style="width:4.5rem"></label>
+    <button class="action" id="btn-compare"><span class="spinner"></span>Comparer</button>
+  </div>
+  <div class="out" id="out-compare"></div>
+</section>
+
+</main>
+<footer>
+  Démo de l'API trainedml (FastAPI). Code source et documentation sur
+  <a href="https://github.com/diamankayero/trainedml">GitHub</a>.
+</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || res.statusText);
+  return data;
+}
+
+async function run(btn, out, fn) {
+  btn.disabled = true; btn.classList.add("busy");
+  out.innerHTML = "";
+  try { out.innerHTML = await fn(); }
+  catch (e) { out.innerHTML = `<span class="error">${e.message}</span>`; }
+  finally { btn.disabled = false; btn.classList.remove("busy"); }
+}
+
+api("/api/models").then(m => {
+  $("train-model").innerHTML =
+    [...m.classifiers, ...m.regressors].map(n => `<option>${n}</option>`).join("");
+});
+
+$("btn-train").onclick = () => run($("btn-train"), $("out-train"), async () => {
+  const d = await api("/api/train", {
+    dataset: $("train-dataset").value,
+    model: $("train-model").value || "random_forest",
+    seed: Number($("train-seed").value),
+  });
+  const tiles = Object.entries(d.scores).map(([k, v]) =>
+    `<div class="tile"><div class="label">${k}</div><div class="value">${v.toFixed(3)}</div></div>`
+  ).join("");
+  return `<p class="meta"><span class="okline">Modèle entraîné.</span>
+      ${d.model} (${d.task}), ${d.n_train} observations d'entraînement, ${d.n_test} de test.</p>
+    <div class="tiles">${tiles}</div>`;
+});
+
+$("btn-predict").onclick = () => run($("btn-predict"), $("out-predict"), async () => {
+  const features = JSON.parse($("predict-features").value);
+  const d = await api("/api/predict", { features });
+  const chips = d.predictions.map((p, i) =>
+    `<span class="chip">obs. ${i + 1} : <b>${p}</b></span>`).join("");
+  return `<p class="meta">Prédictions du modèle ${d.model} :</p><div class="chips">${chips}</div>`;
+});
+
+$("btn-compare").onclick = () => run($("btn-compare"), $("out-compare"), async () => {
+  const d = await api("/api/compare", {
+    dataset: $("cmp-dataset").value,
+    cv: Number($("cmp-cv").value),
+  });
+  const rows = d.results;
+  if (!rows.length) return "Aucun résultat.";
+  const primary = "accuracy" in rows[0] ? "accuracy" : "r2";
+  const cols = Object.keys(rows[0]).filter(c => !c.endsWith("_std"));
+  const head = "<tr>" + cols.map(c =>
+    `<th>${c === primary ? c + " (barre)" : c}</th>`).join("") + "</tr>";
+  const body = rows.map((r, i) => {
+    const cells = cols.map(c => {
+      if (c === "model") return `<td>${r[c]}</td>`;
+      if (c === primary) {
+        const pct = Math.max(0, Math.min(1, r[c])) * 100;
+        const std = r[c + "_std"] !== undefined ? ` ± ${r[c + "_std"].toFixed(3)}` : "";
+        return `<td><span class="scorebar"><span class="track">` +
+               `<span class="fill" style="width:${pct}%"></span></span>` +
+               `${r[c].toFixed(3)}${std}</span></td>`;
+      }
+      const v = r[c];
+      return `<td>${typeof v === "number" ? v.toFixed(3) : v}</td>`;
+    }).join("");
+    return `<tr${i === 0 ? ' class="best"' : ""}>${cells}</tr>`;
+  }).join("");
+  return `<p class="meta">Validation croisée à ${d.cv} plis, métrique principale : ${primary}.</p>
+    <div class="table-wrap"><table>${head}<tbody>${body}</tbody></table></div>`;
+});
+</script>
+</body>
+</html>

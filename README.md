@@ -40,9 +40,9 @@ uvicorn api:app --reload
 | Route | Corps | Retour |
 |---|---|---|
 | `GET /api/models` | - | classificateurs et régresseurs disponibles |
-| `POST /api/train` | dataset ou url+target, model, model_params, test_size, seed | scores, tâche, features |
+| `POST /api/train` | dataset ou url+target ou data+target, model, model_params, test_size, seed | scores, tâche, features |
 | `POST /api/predict` | features (lignes à prédire) | prédictions du dernier modèle entraîné |
-| `POST /api/compare` | dataset ou url+target, cv, seed | tableau comparatif (validation croisée) |
+| `POST /api/compare` | dataset ou url+target ou data+target, models, cv, seed | tableau comparatif (validation croisée) |
 
 ## Déploiement
 

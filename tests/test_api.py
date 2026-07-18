@@ -57,6 +57,41 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("trainedml", res.text)
 
+    def test_dataset(self):
+        res = self.client.get("/api/dataset", params={"name": "iris", "limit": 10})
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["target"], "species")
+        self.assertEqual(len(data["rows"]), 10)
+        self.assertEqual(data["n_rows"], 150)
+        self.assertIn("sepal_length", data["means"])
+        self.assertIn("setosa", data["classes"])
+
+    def test_train_with_uploaded_data(self):
+        rows = [
+            {"a": i, "b": i * 2, "cible": "x" if i % 2 else "y"}
+            for i in range(40)
+        ]
+        res = self.client.post("/api/train", json={
+            "data": rows, "target": "cible", "model": "knn",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["task"], "classification")
+
+    def test_compare_subset_of_models(self):
+        res = self.client.post("/api/compare", json={
+            "dataset": "iris", "cv": 2, "models": ["knn", "logistic"],
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.json()["results"]), 2)
+
+    def test_report(self):
+        res = self.client.post("/api/report", json={"dataset": "iris", "title": "Test EDA"})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/html", res.headers["content-type"])
+        self.assertIn("Test EDA", res.text)
+        self.assertIn("data:image/png;base64", res.text)
+
 
 if __name__ == "__main__":
     unittest.main()

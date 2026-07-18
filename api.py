@@ -129,6 +129,37 @@ def list_models() -> Dict[str, List[str]]:
     }
 
 
+def _feature_importances(trainer) -> Optional[List[Dict[str, Any]]]:
+    """
+    Importance des variables du modèle entraîné, si le modèle sait la donner :
+    feature_importances_ pour les forêts, |coefficients| pour les modèles
+    linéaires et logistiques (moyennés entre classes), rien pour KNN.
+    Les importances sont normalisées (somme = 1) et plafonnées au top 15.
+    """
+    import numpy as np
+    try:
+        est = getattr(trainer.model, "model", trainer.model)
+        if trainer.preprocessor is not None:
+            # Noms dans l'espace prétraité (après one-hot), sans le préfixe num__/cat__
+            names = [n.split("__", 1)[-1]
+                     for n in trainer.preprocessor.get_feature_names_out()]
+        else:
+            names = list(trainer.feature_names_ or [])
+        if hasattr(est, "feature_importances_"):
+            vals = np.asarray(est.feature_importances_, dtype=float)
+        elif hasattr(est, "coef_"):
+            vals = np.abs(np.atleast_2d(est.coef_)).mean(axis=0)
+        else:
+            return None
+        if len(names) != len(vals):
+            return None
+        total = float(vals.sum()) or 1.0
+        pairs = sorted(zip(names, vals / total), key=lambda p: -p[1])[:15]
+        return [{"feature": str(n), "importance": round(float(v), 4)} for n, v in pairs]
+    except Exception:
+        return None
+
+
 @app.post("/api/train")
 def train(req: TrainRequest) -> Dict[str, Any]:
     """Entraîne un modèle et retourne ses scores sur le jeu de test."""
@@ -150,6 +181,7 @@ def train(req: TrainRequest) -> Dict[str, Any]:
         "feature_names": trainer.feature_names_,
         "n_train": len(trainer.X_train),
         "n_test": len(trainer.X_test),
+        "importances": _feature_importances(trainer),
     }
 
 

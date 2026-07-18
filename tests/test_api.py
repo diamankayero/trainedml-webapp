@@ -104,6 +104,14 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(len(d["target"]["items"]), 3)
         self.assertTrue(all("p_value" in n for n in d["normality"]))
 
+    def test_train_returns_importances(self):
+        res = self.client.post("/api/train", json={"dataset": "iris", "model": "random_forest"})
+        imp = res.json()["importances"]
+        self.assertEqual(len(imp), 4)
+        self.assertAlmostEqual(sum(i["importance"] for i in imp), 1.0, places=1)
+        res = self.client.post("/api/train", json={"dataset": "iris", "model": "knn"})
+        self.assertIsNone(res.json()["importances"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -132,6 +132,9 @@
 
   footer { max-width: 960px; margin: 0 auto 2rem; padding: 0 1.5rem;
            color: var(--muted); font-size: .8rem; }
+  .api-status { max-width: 960px; margin: 1rem auto -.4rem; padding: 0 1.5rem;
+                color: var(--muted); font-size: .85rem; }
+  .api-status.warn { color: var(--critical); }
 </style>
 </head>
 <body>
@@ -145,6 +148,7 @@
     </nav>
   </div>
 </header>
+<p class="api-status" id="api-status" hidden></p>
 <main>
 
 <section>
@@ -221,10 +225,38 @@ async function run(btn, out, fn) {
   finally { btn.disabled = false; btn.classList.remove("busy"); }
 }
 
-api("/api/models").then(m => {
-  $("train-model").innerHTML =
-    [...m.classifiers, ...m.regressors].map(n => `<option>${n}</option>`).join("");
-});
+// Remplir la liste des modèles au chargement, avec réessais pendant le
+// réveil du serveur (plan gratuit) et liste de secours si l'API reste muette.
+const FALLBACK_MODELS = ["knn", "logistic", "random_forest",
+  "knn_regressor", "linear", "ridge", "lasso", "random_forest_regressor"];
+
+function fillModels(models) {
+  $("train-model").innerHTML = models.map(n => `<option>${n}</option>`).join("");
+  $("train-model").disabled = false;
+}
+
+async function loadModels(attempt = 0) {
+  const status = $("api-status");
+  try {
+    const m = await api("/api/models");
+    fillModels([...m.classifiers, ...m.regressors]);
+    status.hidden = true;
+  } catch {
+    if (attempt < 6) {
+      status.hidden = false;
+      status.textContent = "Réveil du serveur en cours (plan gratuit, jusqu'à une minute)...";
+      setTimeout(() => loadModels(attempt + 1), 5000);
+    } else {
+      fillModels(FALLBACK_MODELS);
+      status.hidden = false;
+      status.className = "api-status warn";
+      status.textContent = "L'API ne répond pas pour le moment ; l'interface reste utilisable, réessayez dans quelques instants.";
+    }
+  }
+}
+$("train-model").disabled = true;
+$("train-model").innerHTML = "<option value=''>chargement...</option>";
+loadModels();
 
 $("btn-train").onclick = () => run($("btn-train"), $("out-train"), async () => {
   const d = await api("/api/train", {

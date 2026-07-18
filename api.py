@@ -212,6 +212,91 @@ def get_dataset(name: Optional[str] = None, url: Optional[str] = None,
     }
 
 
+@app.post("/api/analysis")
+def analysis(req: ReportRequest) -> Dict[str, Any]:
+    """
+    Analyse exploratoire en chiffres (pas d'images) : le frontend dessine
+    lui-même avec ses propres composants. Contenu :
+
+    - missing : valeurs manquantes par colonne (nombre et pourcentage)
+    - histograms : par variable numérique, bords d'intervalles et comptages
+    - correlation : matrice de corrélation des variables numériques
+    - outliers : nombre d'outliers par variable (méthode IQR)
+    - normality : p-value de Shapiro-Wilk par variable
+    - target : distribution de la cible (comptages par classe, ou histogramme)
+    """
+    import numpy as np
+    from trainedml.viz.normality import normality_tests
+    from trainedml.viz.outliers import outlier_summary
+
+    X, y = _resolve_data(req.dataset, req.url, req.target, req.data)
+    numeric = X.select_dtypes("number")
+
+    # Valeurs manquantes par colonne
+    df = pd.concat([X, y], axis=1)
+    missing = [
+        {"column": str(c), "count": int(n), "pct": round(float(n) / len(df) * 100, 2)}
+        for c, n in df.isnull().sum().items()
+    ]
+
+    # Histogrammes des variables numériques (12 intervalles)
+    histograms = []
+    for col in numeric.columns:
+        values = numeric[col].dropna()
+        counts, edges = np.histogram(values, bins=12)
+        histograms.append({
+            "column": str(col),
+            "edges": [round(float(e), 4) for e in edges],
+            "counts": [int(c) for c in counts],
+        })
+
+    # Matrice de corrélation
+    corr = numeric.corr()
+    correlation = {
+        "columns": [str(c) for c in corr.columns],
+        "values": [[None if pd.isna(v) else round(float(v), 3) for v in row]
+                   for row in corr.values],
+    }
+
+    # Outliers (IQR) et normalité (Shapiro), avec repli silencieux par colonne
+    try:
+        # outlier_summary retourne {colonne: valeurs aberrantes} ; on ne garde
+        # que le nombre, le détail n'intéresse pas le tableau de bord.
+        outliers = [{"column": str(c), "count": int(len(v))}
+                    for c, v in outlier_summary(numeric).items()]
+    except Exception:
+        outliers = []
+    normality = []
+    try:
+        for col, res in normality_tests(numeric, columns=list(numeric.columns)).items():
+            stat, pval = res["shapiro"]
+            normality.append({"column": str(col), "p_value": round(float(pval), 4),
+                              "normal": bool(pval > 0.05)})
+    except Exception:
+        pass
+
+    # Distribution de la cible : classes ou histogramme selon la tâche
+    if y.nunique() <= 20:
+        counts = y.astype(str).value_counts()
+        target = {"kind": "classes",
+                  "items": [{"label": str(k), "count": int(v)} for k, v in counts.items()]}
+    else:
+        counts, edges = np.histogram(pd.to_numeric(y, errors="coerce").dropna(), bins=12)
+        target = {"kind": "histogram", "name": str(y.name),
+                  "edges": [round(float(e), 4) for e in edges],
+                  "counts": [int(c) for c in counts]}
+
+    return {
+        "n_rows": int(len(df)),
+        "missing": missing,
+        "histograms": histograms,
+        "correlation": correlation,
+        "outliers": outliers,
+        "normality": normality,
+        "target": target,
+    }
+
+
 @app.post("/api/report", response_class=HTMLResponse)
 def report(req: ReportRequest) -> HTMLResponse:
     """

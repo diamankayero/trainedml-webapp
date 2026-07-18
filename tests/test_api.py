@@ -92,6 +92,18 @@ class TestAPI(unittest.TestCase):
         self.assertIn("Test EDA", res.text)
         self.assertIn("data:image/png;base64", res.text)
 
+    def test_analysis(self):
+        res = self.client.post("/api/analysis", json={"dataset": "iris"})
+        self.assertEqual(res.status_code, 200)
+        d = res.json()
+        self.assertEqual(d["n_rows"], 150)
+        self.assertEqual(len(d["correlation"]["columns"]), 4)
+        self.assertEqual(len(d["histograms"]), 4)
+        self.assertEqual(len(d["histograms"][0]["counts"]), 12)
+        self.assertEqual(d["target"]["kind"], "classes")
+        self.assertEqual(len(d["target"]["items"]), 3)
+        self.assertTrue(all("p_value" in n for n in d["normality"]))
+
 
 if __name__ == "__main__":
     unittest.main()

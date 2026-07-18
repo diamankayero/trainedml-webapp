@@ -7,6 +7,11 @@ une API FastAPI et une page HTML/JS qui la consomme.
 première visite après une période d'inactivité prend ~30 s, le temps que le
 service se réveille).
 
+Une version **React** de la même interface existe :
+[ModeLmL](https://github.com/diamankayero/ModeLmL), en ligne sur
+https://diamankayero.github.io/ModeLmL/. La page HTML de ce dépôt reste la
+version la plus lisible pour apprendre (un seul fichier, zéro build).
+
 Ce dépôt est volontairement séparé du package : il **consomme** `trainedml`
 depuis PyPI comme n'importe quel utilisateur (`requirements.txt`), ce qui en
 fait aussi un test d'intégration permanent du package publié. Le pattern :

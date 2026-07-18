@@ -43,6 +43,10 @@ uvicorn api:app --reload
 | `POST /api/train` | dataset ou url+target ou data+target, model, model_params, test_size, seed | scores, tâche, features |
 | `POST /api/predict` | features (lignes à prédire) | prédictions du dernier modèle entraîné |
 | `POST /api/compare` | dataset ou url+target ou data+target, models, cv, seed | tableau comparatif (validation croisée) |
+| `GET /api/dataset` | name ou url+target (query) | lignes (plafonnées), describe, moyennes, classes |
+| `POST /api/analysis` | dataset ou url+target ou data+target | analyse en chiffres : manquants, histogrammes, corrélations, outliers, normalité, cible |
+| `POST /api/report` | dataset ou url+target ou data, title | rapport EDA HTML auto-contenu (export) |
+| `GET /docs` | - | documentation interactive générée par FastAPI (Swagger) |
 
 ## Déploiement
 

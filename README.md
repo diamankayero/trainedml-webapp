@@ -66,6 +66,18 @@ L'hébergeur fournit la variable `PORT` ; l'image l'utilise automatiquement.
 
 ## Limites assumées (démo)
 
+- **Réveil à froid (~30 s).** Le plan gratuit Render met le service en
+  veille après 15 min d'inactivité ; la première requête suivante le
+  réveille, ce qui prend jusqu'à ~30 s. Ce n'est pas un bug non traité :
+  c'est un compromis explicite pour un projet de démonstration/portfolio.
+  - Mitigé côté client : la page de démo (`static/index.html`) et ModeLmL
+    réessaient automatiquement pendant le réveil et affichent un message
+    d'état, au lieu d'un formulaire vide et silencieux.
+  - Alternatives écartées : un ping périodique (type UptimeRobot) irait à
+    l'encontre de l'esprit du plan gratuit ; un plan payant (~7 $/mois)
+    supprimerait le problème mais n'a pas de sens pour ce projet.
+  - À reconsidérer seulement si ce service devait un jour recevoir du
+    trafic réel.
 - Un seul modèle en mémoire à la fois ; pas de persistance entre
   redémarrages. Pour un vrai déploiement : `Trainer.save()` au train et
   `Trainer.load()` au démarrage, ou un stockage par utilisateur.
